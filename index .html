@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Авиация Беларуси — аналитический дашборд</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg:#f3f6fb; --card:#fff; --ink:#172033; --muted:#65718a;
+      --blue:#2457d6; --line:#e5eaf2; --green:#16845b;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, sans-serif; background:var(--bg); color:var(--ink); }
+    header { padding:30px 5vw 24px; color:white; background:linear-gradient(120deg,#102b60,#2866d7); }
+    header .eyebrow { font-size:12px; letter-spacing:1.5px; opacity:.8; text-transform:uppercase; }
+    h1 { margin:10px 0 8px; font-size:clamp(25px,4vw,38px); }
+    header p { margin:0; max-width:780px; line-height:1.5; opacity:.9; }
+    main { max-width:1250px; margin:24px auto; padding:0 18px 40px; }
+    .notice { background:#fff7df; border:1px solid #f0d58b; border-radius:12px; padding:13px 16px; margin-bottom:18px; color:#604b13; line-height:1.45; font-size:13px; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:18px 0; }
+    .toolbar label { font-size:13px; color:var(--muted); }
+    select { margin-left:8px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:white; color:var(--ink); }
+    .tag { font-size:12px; color:var(--muted); }
+    .kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 3px 12px rgba(20,40,80,.04); min-width:0; }
+    .kpi-label { font-size:12px; color:var(--muted); margin-bottom:10px; }
+    .kpi-value { font-size:clamp(22px,3vw,30px); font-weight:700; }
+    .kpi-foot { margin-top:7px; font-size:11px; color:var(--muted); }
+    .grid { display:grid; grid-template-columns:1.45fr 1fr; gap:14px; margin-top:14px; }
+    .grid.equal { grid-template-columns:1fr 1fr; }
+    h2 { margin:0 0 5px; font-size:16px; }
+    .sub { margin:0 0 14px; font-size:12px; color:var(--muted); }
+    .chart-wrap { position:relative; height:285px; }
+    .insights { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px; }
+    .insight { border-left:3px solid var(--blue); padding:4px 0 4px 12px; font-size:13px; line-height:1.5; }
+    .sources { margin-top:14px; font-size:12px; color:var(--muted); line-height:1.7; }
+    a { color:var(--blue); }
+    footer { text-align:center; color:var(--muted); font-size:11px; padding:18px; }
+    @media(max-width:850px) { .kpis {grid-template-columns:repeat(2,1fr)} .grid,.grid.equal {grid-template-columns:1fr} .insights {grid-template-columns:1fr} }
+    @media(max-width:480px) { .kpis {grid-template-columns:1fr 1fr; gap:8px} .card {padding:13px} .chart-wrap {height:240px} }
+  </style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Аналитический проект · Республика Беларусь</div>
+  <h1>Рынок авиации Беларуси</h1>
+  <p>Интерактивный обзор пассажиропотока, сезонности и региональной структуры авиаперевозок. Выберите год, чтобы обновить показатели.</p>
+</header>
+<main>
+  <div class="notice">
+    <strong>Важно: демонстрационный макет.</strong> Числа в графиках ниже условные и нужны для показа работы дашборда. Не выдавайте их за официальную статистику. Перед сдачей проекта замените данные на проверенные значения из Белстата, аэропортов и публичных отчётов, укажите период и методику подсчёта.
+  </div>
+
+  <div class="toolbar">
+    <label>Год анализа:
+      <select id="yearSelect">
+        <option value="2024">2024</option>
+        <option value="2023">2023</option>
+        <option value="2022">2022</option>
+        <option value="2021">2021</option>
+      </select>
+    </label>
+    <span class="tag">Единицы: пассажиры · рейсы · тонны</span>
+  </div>
+
+  <section class="kpis">
+    <div class="card"><div class="kpi-label">Пассажиры за год</div><div class="kpi-value" id="passengersKpi">—</div><div class="kpi-foot">Демонстрационные данные</div></div>
+    <div class="card"><div class="kpi-label">Количество рейсов</div><div class="kpi-value" id="flightsKpi">—</div><div class="kpi-foot">Демонстрационные данные</div></div>
+    <div class="card"><div class="kpi-label">Груз, тонн</div><div class="kpi-value" id="cargoKpi">—</div><div class="kpi-foot">Демонстрационные данные</div></div>
+    <div class="card"><div class="kpi-label">Изменение к прошлому году</div><div class="kpi-value" id="growthKpi">—</div><div class="kpi-foot">По пассажиропотоку</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Динамика пассажиропотока</h2>
+      <p class="sub">Условный пример изменения по годам</p>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Региональное распределение</h2>
+      <p class="sub">Условная структура пассажиропотока по аэропортам/регионам</p>
+      <div class="chart-wrap"><canvas id="regionChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="grid equal">
+    <div class="card">
+      <h2>Сезонность</h2>
+      <p class="sub">Условное распределение пассажиров по месяцам выбранного года</p>
+      <div class="chart-wrap"><canvas id="seasonChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Структура показателей</h2>
+      <p class="sub">Доля пассажиров по условным направлениям обслуживания</p>
+      <div class="chart-wrap"><canvas id="structureChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <h2>Предварительные аналитические наблюдения</h2>
+    <p class="sub">Это автоматические комментарии к демонстрационному набору, а не выводы об отрасли.</p>
+    <div class="insights">
+      <div class="insight" id="insight1">После загрузки данных появится наблюдение о динамике.</div>
+      <div class="insight" id="insight2">После загрузки данных появится наблюдение о сезонности.</div>
+      <div class="insight" id="insight3">После загрузки данных появится наблюдение о региональном распределении.</div>
+    </div>
+  </section>
+
+  <section class="sources">
+    <strong>Источники для заполнения реальными данными:</strong><br>
+    <a href="https://www.belstat.gov.by/" target="_blank" rel="noopener">Белстат</a> ·
+    <a href="https://airport.by/" target="_blank" rel="noopener">Национальный аэропорт Минск</a> ·
+    <a href="https://mintrans.gov.by/" target="_blank" rel="noopener">Министерство транспорта и коммуникаций РБ</a> ·
+    <a href="https://belavia.by/" target="_blank" rel="noopener">Belavia</a> ·
+    <a href="https://trends.google.com/" target="_blank" rel="noopener">Google Trends</a>
+    <br>В итоговой работе укажите точное название таблицы/отчёта, дату публикации, ссылку, единицы измерения и дату выгрузки.
+  </section>
+</main>
+<footer>Учебный аналитический проект · Рынок авиации Республики Беларусь</footer>
+
+<script>
+  // ЗАМЕНИТЕ значения в этом объекте на проверенные данные из источников.
+  // Все числа ниже условные и не являются официальной статистикой.
+  const data = {
+    2021: { passengers: 1500000, flights: 18000, cargo: 12000, regions: [72,10,7,5,4,2],
+      months: [90000,85000,105000,110000,130000,145000,160000,155000,140000,125000,115000,140000] },
+    2022: { passengers: 1650000, flights: 19500, cargo: 12500, regions: [70,11,7,5,5,2],
+      months: [95000,90000,110000,120000,140000,150000,170000,165000,145000,130000,120000,165000] },
+    2023: { passengers: 1900000, flights: 22000, cargo: 13200, regions: [69,12,7,5,5,2],
+      months: [105000,100000,125000,135000,155000,170000,190000,185000,165000,145000,135000,190000] },
+    2024: { passengers: 2100000, flights: 24500, cargo: 14000, regions: [68,12,8,5,5,2],
+      months: [115000,110000,135000,145000,170000,185000,205000,200000,180000,160000,150000,145000] }
+  };
+
+  const fmt = n => new Intl.NumberFormat('ru-RU').format(n);
+  const years = Object.keys(data).sort();
+  const regionNames = ['Минск','Брест','Гомель','Витебск','Гродно','Могилёв'];
+  const monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+
+  const commonOptions = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, usePointStyle:true } } }
+  };
+
+  const trendChart = new Chart(document.getElementById('trendChart'), {
+    type:'line',
+    data:{ labels:years, datasets:[{ label:'Пассажиры', data:years.map(y=>data[y].passengers),
+      borderColor:'#2457d6', backgroundColor:'rgba(36,87,214,.12)', fill:true, tension:.3 }] },
+    options:{...commonOptions, scales:{y:{beginAtZero:true, ticks:{callback:v=>fmt(v)}}}}
+  });
+
+  const regionChart = new Chart(document.getElementById('regionChart'), {
+    type:'doughnut',
+    data:{ labels:regionNames, datasets:[{ data:data[2024].regions,
+      backgroundColor:['#2457d6','#4f83ed','#79a3f2','#9ab9f5','#b8cef8','#d6e2fb'], borderWidth:1 }] },
+    options:commonOptions
+  });
+
+  const seasonChart = new Chart(document.getElementById('seasonChart'), {
+    type:'bar',
+    data:{ labels:monthNames, datasets:[{ label:'Пассажиры', data:data[2024].months,
+      backgroundColor:'#4f83ed', borderRadius:5 }] },
+    options:{...commonOptions, scales:{y:{beginAtZero:true, ticks:{callback:v=>fmt(v)}}}}
+  });
+
+  const structureChart = new Chart(document.getElementById('structureChart'), {
+    type:'pie',
+    data:{ labels:['Регулярные рейсы','Чартерные рейсы','Другие перевозки'],
+      datasets:[{ data:[65,25,10], backgroundColor:['#2457d6','#4f83ed','#a9bff2'] }] },
+    options:commonOptions
+  });
+
+  function updateDashboard(year) {
+    const d = data[year];
+    const previous = data[String(Number(year)-1)];
+    document.getElementById('passengersKpi').textContent = fmt(d.passengers);
+    document.getElementById('flightsKpi').textContent = fmt(d.flights);
+    document.getElementById('cargoKpi').textContent = fmt(d.cargo);
+    const growth = previous ? ((d.passengers-previous.passengers)/previous.passengers*100) : null;
+    document.getElementById('growthKpi').textContent = growth === null ? 'н/д' : (growth>0?'+':'')+growth.toFixed(1)+'%';
+
+    regionChart.data.datasets[0].data = d.regions;
+    regionChart.update();
+    seasonChart.data.datasets[0].data = d.months;
+    seasonChart.update();
+
+    const peakMonth = monthNames[d.months.indexOf(Math.max(...d.months))];
+    const topRegion = regionNames[d.regions.indexOf(Math.max(...d.regions))];
+    document.getElementById('insight1').textContent = growth === null
+      ? 'Для расчёта годового изменения добавьте данные за предыдущий год.'
+      : `В демонстрационном наборе пассажиропоток изменился на ${growth.toFixed(1)}% по сравнению с предыдущим годом.`;
+    document.getElementById('insight2').textContent = `Наибольшее условное значение пассажиропотока приходится на ${peakMonth}.`;
+    document.getElementById('insight3').textContent = `Наибольшая условная доля регионального распределения приходится на ${topRegion}.`;
+  }
+
+  document.getElementById('yearSelect').addEventListener('change', e=>updateDashboard(e.target.value));
+  updateDashboard('2024');
+</script>
+</body>
+</html>
